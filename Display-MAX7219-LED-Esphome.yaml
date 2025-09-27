@@ -60,8 +60,12 @@ display:
       // rallumer après
       it.turn_on_off(true);
       
-# it.printf(40, 0, id(digit_font), "%s", id(ha_weather).state.c_str());
-# it.line(1, 7, 31, 7);
+      #} else {
+          # it.printf(40, 0, id(digit_font), "%s", id(ha_weather).state.c_str());
+          #id(timer) = 1;
+      #}   
+
+
 font:
   - file: "fonts/pixelmix.ttf"
     id: digit_font
@@ -75,9 +79,14 @@ sensor:
   - platform: homeassistant
     id: ha_ext
     entity_id: sensor.exterieure
+    
+#text_sensor:
+#  - platform: homeassistant
+#    id: ha_weather
+#    entity_id: sensor.bain_de_bretagne_daily_original_condition
 
 globals:
-  - id: mode # 1 = time, 2 = temperature
+  - id: mode # 1 = time, 2 = temperature 3 = xxxxxx
     type: int
     initial_value: "1"
   - id: timer
@@ -89,6 +98,9 @@ globals:
   - id: temp_duration
     type: int
     initial_value: "1"  # 1 * 5s = 5s
+#- id: sensor_duration
+#   type: int
+#    initial_value: "1"  # 1 * 5s = 5s
 
 interval:
   - interval: 5s
