@@ -1,0 +1,174 @@
+substitutions:
+  value_manual_ip: !secret value_manual_ip
+
+# A modifier
+  name_device: "horloge-led"
+  friendly_name: "Horloge led"
+  name_ssid: !secret wifi_ssid
+  password_ssid: !secret wifi_password
+  value_static_ip: ${value_manual_ip}135
+  logger_level: INFO
+
+<<: !include .common_minimal.yaml
+
+esp8266:
+  board: esp01_1m
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+ota:
+  - platform: esphome
+    password: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+binary_sensor:
+  - platform: status
+    name: ${name_device}_Status
+
+button:
+  - platform: restart
+    id: button_restart
+    name: ${name_device}_Restart
+
+spi:
+  clk_pin: GPIO5
+  mosi_pin: GPIO4
+
+display:
+  - platform: max7219digit
+    cs_pin: GPIO0
+    num_chips: 4
+    rotate_chip: 180
+    reverse_enable: true
+    scroll_enable: False
+    lambda: |-
+      it.intensity((int)id(ha_intensity).state);
+
+      // extinction si alarme active OU switch sur OFF
+      if (id(alarme_active) == 1 || !id(screen_enabled)) {
+          it.turn_on_off(false);
+      } else {
+          // sinon on continue l’affichage normal
+          it.turn_on_off(false);
+
+          if (id(mode) == 1) {
+              it.strftime(5, 0, id(digit_font), "%H:%M", id(hass_time).now());
+          } else {
+              it.printf(5, 0, id(digit_font), "%.1f°", id(ha_ext).state);
+              id(timer) = 1;
+          }
+
+          it.turn_on_off(true);
+      }  
+            
+# it.printf(40, 0, id(digit_font), "%s", id(ha_weather).state.c_str());
+# it.line(1, 7, 31, 7);
+font:
+  - file: "fonts/pixelmix.ttf"
+    id: digit_font
+    size: 8
+
+time:
+  - platform: homeassistant
+    id: hass_time
+
+sensor:
+  - platform: homeassistant
+    id: ha_ext
+    entity_id: sensor.exterieure
+
+  - platform: wifi_signal
+    name: ${name_device}_Wifi_signal
+    id: wifi_signal_db
+    update_interval: 60s
+
+  - platform: uptime
+    name: ${name_device}_Uptime
+    
+text_sensor:
+  - platform: homeassistant
+    id: ha_weather
+    entity_id: sensor.bain_de_bretagne_daily_original_condition
+
+  - platform: homeassistant
+    id: ha_alarm_state
+    entity_id: alarm_control_panel.8889_aaa_zone_1_alarm
+    on_value:
+      then:
+        - lambda: |-
+            if (x == "armed_away") {
+              // Alarme armée à l'extérieur => écran éteint
+              id(alarme_active) = 1;
+            } else if (x == "armed_night") {
+              // Alarme armée => écran éteint
+              id(alarme_active) = 1;
+            } else if (x == "disarmed") {
+              // Alarme désarmée => écran allumé
+              id(alarme_active) = 0;
+            } else {
+              // États inconnus => écran allumé par défaut
+              id(alarme_active) = 0;
+            }
+
+switch:
+  - platform: template
+    name: "Ecran horloge led"
+    id: screen_switch
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          id(screen_enabled) = true;
+    turn_off_action:
+      - lambda: |-
+          id(screen_enabled) = false;
+
+number:
+  - platform: homeassistant
+    id: ha_time_duration
+    entity_id: input_number.matrix_duree_affichage_heure  # helper HA
+  - platform: homeassistant
+    id: ha_temp_duration
+    entity_id: input_number.matrix_duree_affichage_temperature  # helper HA
+  - platform: homeassistant
+    id: ha_intensity
+    entity_id: input_number.matrix_intensite_afficheur  # helper HA
+
+globals:
+  - id: mode # 1 = time, 2 = temperature
+    type: int
+    initial_value: "1"
+  - id: timer
+    type: int
+    initial_value: "0"
+  - id: time_duration   # en intervalles de 5s
+    type: int
+    initial_value: "4"  # 4 * 5s = 20s
+  - id: temp_duration
+    type: int
+    initial_value: "1"  # 1 * 5s = 5s
+  - id: alarme_active
+    type: int
+    initial_value: "0"  # active = 1, inactive = 0
+  - id: screen_enabled
+    type: bool
+    restore_value: yes
+    initial_value: "true"
+
+interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          id(timer) += 5;  // on compte en secondes maintenant
+
+          int time_dur = (int)id(ha_time_duration).state;
+          int temp_dur = (int)id(ha_temp_duration).state;
+
+          if (id(mode) == 1 && id(timer) >= time_dur) {
+            id(mode) = 2;
+            id(timer) = 0;
+          } else if (id(mode) == 2 && id(timer) >= temp_dur) {
+            id(mode) = 1;
+            id(timer) = 0;
+          }

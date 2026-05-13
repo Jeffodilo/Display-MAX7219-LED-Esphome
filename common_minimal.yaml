@@ -1,0 +1,35 @@
+esphome:
+  name: ${name_device}
+  friendly_name: ${friendly_name}
+  #on_boot:
+  #  - lambda: |-
+  #      id(my_ota).set_auth_password("e8038a89e26f589499eeb4a7e5a27e07");
+
+# WiFi Component: https://esphome.io/components/wifi.html
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+  min_auth_mode: WPA2
+  
+  manual_ip:
+    static_ip: ${value_static_ip}
+    gateway: !secret manual_ip_gateway
+    subnet: !secret manual_ip_subnet
+  ap:
+    ssid: FB_${name_device} 
+    password: !secret fallback_password
+
+# Web Server: https://esphome.io/components/web_server.html
+web_server:
+  local: true
+  port: 80
+  auth:
+    username: !secret web_server_username
+    password: !secret web_server_password
+
+# Logger Component: https://esphome.io/components/logger.html
+# NONE, ERROR, WARN, INFO, DEBUG, VERBOSE, VERY_VERBOSE
+logger:
+  level: ${logger_level}
+
